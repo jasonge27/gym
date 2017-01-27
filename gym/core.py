@@ -24,6 +24,9 @@ class Env(object):
         configure
         seed
 
+        snapshot
+        restore
+
     When implementing an environment, override the following methods
     in your subclass:
 
@@ -33,6 +36,9 @@ class Env(object):
         _close
         _configure
         _seed
+
+        _snapshot
+        _restore
 
     And set the following attributes:
 
@@ -84,6 +90,9 @@ class Env(object):
         raise NotImplementedError
     def _seed(self, seed=None): return []
 
+    def _snapshot(self): raise NotImplementedError
+    def _restore(self, snapshot): raise NotImplementedError
+
     # Do not override
     _owns_render = True
 
@@ -122,6 +131,23 @@ class Env(object):
             self.configure()
         observation = self._reset()
         return observation
+
+    def restore(self, snapshot):
+        """
+        restore the state of the env & agent to a previous state according to the snapshot
+
+        :param snapshot: a dictionary of key params for previous env & agent state
+
+        :return: observation (object), the initial observation of the snapshot
+        """
+        observation = self._restore(snapshot)
+        return observation
+
+    def snapshot(self):
+        """
+        :return: a dictionary of the key params of the environment
+        """
+        return self._snapshot()
 
     def render(self, mode='human', close=False):
         """Renders the environment.

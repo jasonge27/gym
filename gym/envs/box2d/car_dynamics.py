@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import Box2D
+import copy
 from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, revoluteJointDef, contactListener, shape)
 
 # Top-down car dynamics simulation.
@@ -105,6 +106,23 @@ class Car:
             self.wheels.append(w)
         self.drawlist =  self.wheels + [self.hull]
         self.particles = []
+
+    def deepcopy(self, world):
+        new_car = Car(world, self.hull.angle, self.hull.position[0], self.hull.position[1])
+
+        for (old_wheel, new_wheel) in zip(self.wheels, new_car.wheels):
+            new_wheel.wheel_rad = copy.deepcopy(old_wheel.wheel_rad)
+            new_wheel.gas = copy.deepcopy(old_wheel.gas)
+            new_wheel.brake = copy.deepcopy(old_wheel.brake)
+            new_wheel.steer = copy.deepcopy(old_wheel.steer)
+            new_wheel.phase = copy.deepcopy(old_wheel.phase)
+            new_wheel.omega = copy.deepcopy(old_wheel.omega)
+            #new_wheel.skid_start = copy.deepcopy(old_wheel.skid_start)
+            #new_wheel.skid_particle = copy.deepcopy(old_wheel.skid_particle)
+            #new_wheel.tiles = old_wheel.tiles
+
+
+        return(new_car)
 
     def gas(self, gas):
         'control: rear wheel drive'

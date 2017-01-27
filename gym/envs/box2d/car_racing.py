@@ -1,5 +1,7 @@
 import sys, math
 import numpy as np
+import copy
+import pdb
 
 import Box2D
 from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, revoluteJointDef, contactListener)
@@ -10,6 +12,7 @@ from gym.envs.box2d.car_dynamics import Car
 from gym.envs.classic_control import rendering
 from gym.utils import colorize, seeding
 
+import pdb
 import pyglet
 from pyglet.gl import *
 
@@ -117,7 +120,7 @@ class CarRacing(gym.Env):
         self.reward = 0.0
         self.prev_reward = 0.0
 
-        self.action_space = spaces.Box( np.array([-1,0,0]), np.array([+1,+1,+1]))  # steer, gas, brake
+        self.action_space = spaces.Box(np.array([-1,0,0]), np.array([+1,+1,+1]))  # steer, gas, brake
         self.observation_space = spaces.Box(low=0, high=255, shape=(STATE_H, STATE_W, 3))
 
     def _seed(self, seed=None):
@@ -146,9 +149,9 @@ class CarRacing(gym.Env):
                 alpha = 2*math.pi*c/CHECKPOINTS
                 self.start_alpha = 2*math.pi*(-0.5)/CHECKPOINTS
                 rad = 1.5*TRACK_RAD
-            checkpoints.append( (alpha, rad*math.cos(alpha), rad*math.sin(alpha)) )
+            checkpoints.append((alpha, rad*math.cos(alpha), rad*math.sin(alpha)))
 
-        #print "\n".join(str(h) for h in checkpoints)
+        print "\n".join(str(h) for h in checkpoints)
         #self.road_poly = [ (    # uncomment this to see checkpoints
         #    [ (tx,ty) for a,tx,ty in checkpoints ],
         #    (0.7,0.7,0.9) ) ]
@@ -292,6 +295,40 @@ class CarRacing(gym.Env):
 
         return self._step(None)[0]
 
+    def _snapshot(self):
+        snapshot = {}
+        #snapshot["track"] = copy.deepcopy(self.track)
+        #snapshot["road"] = copy.deepcopy(self.road)
+        #snapshot["road_poly"] = copy.deepcopy(self.road_poly)
+
+        snapshot["world"] = self.world.Dump()
+        pdb.set_trace()
+
+        snapshot["car"] = self.car.deepcopy(snapshot["world"])
+
+
+        return(snapshot)
+
+    def _restore(self, snapshot):
+        #self._destroy()
+        self.reward = 0.0
+        self.prev_reward = 0.0
+        self.tile_visited_count = 0
+        self.t = 0.0
+
+        #self.track = snapshot["track"]
+        #self.road = snapshot["road"]
+
+        #self.road_poly = snapshot["road_poly"]
+        #self.human_render = False
+
+        self.world = snapshot["world"]
+        #self.car.destroy()
+        self.car = snapshot["car"]
+
+        return self._step(None)[0]
+
+
     def _step(self, action):
         if action is not None:
             self.car.steer(-action[0])
@@ -302,7 +339,8 @@ class CarRacing(gym.Env):
         self.world.Step(1.0/FPS, 6*30, 2*30)
         self.t += 1.0/FPS
 
-        self.state = self._render("state_pixels")
+        #self.state = self._render("state_pixels")
+        self.state = self._render("rgb_array")
 
         step_reward = 0
         done = False
@@ -354,6 +392,8 @@ class CarRacing(gym.Env):
         self.transform.set_rotation(angle)
 
         self.car.draw(self.viewer, mode!="state_pixels")
+
+        #pdb.set_trace()
 
         arr = None
         win = self.viewer.window
@@ -477,6 +517,7 @@ if __name__=="__main__":
         env.monitor.start('/tmp/video-test', force=True)
     env.viewer.window.on_key_press = key_press
     env.viewer.window.on_key_release = key_release
+    prev_snapshot = None
     while True:
         env.reset()
         total_reward = 0.0
@@ -484,9 +525,18 @@ if __name__=="__main__":
         restart = False
         while True:
             s, r, done, info = env.step(a)
+
+            if steps % 300 == 0:
+
+                snapshot = env.snapshot()
+                if prev_snapshot:
+                    env.restore(prev_snapshot)
+                prev_snapshot = snapshot
+
+            #pdb.set_trace()
             total_reward += r
             if steps % 200 == 0 or done:
-                print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
+                print("\nactioxn " + str(["{:+0.2f}".format(x) for x in a]))
                 print("step {} total_reward {:+0.2f}".format(steps, total_reward))
                 #import matplotlib.pyplot as plt
                 #plt.imshow(s)
