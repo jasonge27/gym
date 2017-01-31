@@ -90,8 +90,11 @@ class Env(object):
         raise NotImplementedError
     def _seed(self, seed=None): return []
 
-    def _snapshot(self): raise NotImplementedError
-    def _restore(self, snapshot): raise NotImplementedError
+    def _snapshot(self): 
+        return None
+
+    def _restore(self, snapshot): 
+        pass
 
     # Do not override
     _owns_render = True

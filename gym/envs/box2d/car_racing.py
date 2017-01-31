@@ -1,7 +1,5 @@
 import sys, math
 import numpy as np
-import copy
-import pdb
 
 import Box2D
 from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, revoluteJointDef, contactListener)
@@ -12,7 +10,6 @@ from gym.envs.box2d.car_dynamics import Car
 from gym.envs.classic_control import rendering
 from gym.utils import colorize, seeding
 
-import pdb
 import pyglet
 from pyglet.gl import *
 
@@ -249,7 +246,14 @@ class CarRacing(gym.Env):
             for neg in range(BORDER_MIN_COUNT):
                 border[i-neg] |= border[i]
 
+        self.track = track
+        self.border = border
+
         # Create tiles
+        self._create_tiles(track, border)
+        return True
+
+    def _create_tiles(self, track, border):
         for i in range(len(track)):
             alpha1, beta1, x1, y1 = track[i]
             alpha2, beta2, x2, y2 = track[i-1]
@@ -275,8 +279,6 @@ class CarRacing(gym.Env):
                 b2_l = (x2 + side* TRACK_WIDTH        *math.cos(beta2), y2 + side* TRACK_WIDTH        *math.sin(beta2))
                 b2_r = (x2 + side*(TRACK_WIDTH+BORDER)*math.cos(beta2), y2 + side*(TRACK_WIDTH+BORDER)*math.sin(beta2))
                 self.road_poly.append(( [b1_l, b1_r, b2_r, b2_l], (1,1,1) if i%2==0 else (1,0,0) ))
-        self.track = track
-        return True
 
     def _reset(self):
         self._destroy()
@@ -297,35 +299,28 @@ class CarRacing(gym.Env):
 
     def _snapshot(self):
         snapshot = {}
-        #snapshot["track"] = copy.deepcopy(self.track)
-        #snapshot["road"] = copy.deepcopy(self.road)
-        #snapshot["road_poly"] = copy.deepcopy(self.road_poly)
-
-        snapshot["world"] = self.world.Dump()
-        pdb.set_trace()
-
-        snapshot["car"] = self.car.deepcopy(snapshot["world"])
-
+        snapshot["car"] = self.car.GetAgentStatus()
 
         return(snapshot)
 
     def _restore(self, snapshot):
-        #self._destroy()
         self.reward = 0.0
         self.prev_reward = 0.0
         self.tile_visited_count = 0
         self.t = 0.0
-
-        #self.track = snapshot["track"]
-        #self.road = snapshot["road"]
-
-        #self.road_poly = snapshot["road_poly"]
-        #self.human_render = False
-
-        self.world = snapshot["world"]
-        #self.car.destroy()
-        self.car = snapshot["car"]
-
+        
+        self.car.destroy()
+        status = snapshot["car"]
+        self.car = Car(self.world, status["angle"], status["x"], status["y"]) 
+        self.car.hull.linearVelocity = status["v"]
+        for (w, w_status) in zip(self.car.wheels, status["wheels"]):
+            w.wheel_rad = w_status["rad"]
+            w.gas = w_status["gas"]
+            w.brake = w_status["brake"]
+            w.steer = w_status["steer"]
+            w.omega = w_status["omega"]
+            w.phase = w_status["phase"]
+        
         return self._step(None)[0]
 
 
@@ -340,7 +335,8 @@ class CarRacing(gym.Env):
         self.t += 1.0/FPS
 
         #self.state = self._render("state_pixels")
-        self.state = self._render("rgb_array")
+        #self.state = self._render("rgb_array")
+        self.state = self._render("human")
 
         step_reward = 0
         done = False
@@ -498,26 +494,36 @@ class CarRacing(gym.Env):
 if __name__=="__main__":
     from pyglet.window import key
     a = np.array( [0.0, 0.0, 0.0] )
+    env = CarRacing()
+    env.render()
+    snapshot = None
+
     def key_press(k, mod):
         global restart
+        global snapshot
         if k==0xff0d: restart = True
         if k==key.LEFT:  a[0] = -1.0
         if k==key.RIGHT: a[0] = +1.0
         if k==key.UP:    a[1] = +1.0
         if k==key.DOWN:  a[2] = +0.8   # set 1.0 for wheels to block to zero rotation
+        if k==key.S:
+            snapshot = env.snapshot()
+        if k==key.R:
+            if (snapshot):
+                env.restore(snapshot)
+
     def key_release(k, mod):
         if k==key.LEFT  and a[0]==-1.0: a[0] = 0
         if k==key.RIGHT and a[0]==+1.0: a[0] = 0
         if k==key.UP:    a[1] = 0
         if k==key.DOWN:  a[2] = 0
-    env = CarRacing()
-    env.render()
+
     record_video = False
     if record_video:
         env.monitor.start('/tmp/video-test', force=True)
     env.viewer.window.on_key_press = key_press
     env.viewer.window.on_key_release = key_release
-    prev_snapshot = None
+
     while True:
         env.reset()
         total_reward = 0.0
@@ -526,14 +532,6 @@ if __name__=="__main__":
         while True:
             s, r, done, info = env.step(a)
 
-            if steps % 300 == 0:
-
-                snapshot = env.snapshot()
-                if prev_snapshot:
-                    env.restore(prev_snapshot)
-                prev_snapshot = snapshot
-
-            #pdb.set_trace()
             total_reward += r
             if steps % 200 == 0 or done:
                 print("\nactioxn " + str(["{:+0.2f}".format(x) for x in a]))

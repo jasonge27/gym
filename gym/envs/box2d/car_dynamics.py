@@ -107,22 +107,24 @@ class Car:
         self.drawlist =  self.wheels + [self.hull]
         self.particles = []
 
-    def deepcopy(self, world):
-        new_car = Car(world, self.hull.angle, self.hull.position[0], self.hull.position[1])
+    def GetAgentStatus(self):
+        status = {}
+        status["angle"] = self.hull.angle
+        status["x"] = self.hull.position[0]
+        status["y"] = self.hull.position[1]
+        status["v"] = self.hull.linearVelocity
 
-        for (old_wheel, new_wheel) in zip(self.wheels, new_car.wheels):
-            new_wheel.wheel_rad = copy.deepcopy(old_wheel.wheel_rad)
-            new_wheel.gas = copy.deepcopy(old_wheel.gas)
-            new_wheel.brake = copy.deepcopy(old_wheel.brake)
-            new_wheel.steer = copy.deepcopy(old_wheel.steer)
-            new_wheel.phase = copy.deepcopy(old_wheel.phase)
-            new_wheel.omega = copy.deepcopy(old_wheel.omega)
-            #new_wheel.skid_start = copy.deepcopy(old_wheel.skid_start)
-            #new_wheel.skid_particle = copy.deepcopy(old_wheel.skid_particle)
-            #new_wheel.tiles = old_wheel.tiles
+        status["wheels"] = [{} for w in self.wheels]
+        for (w_status, w) in zip(status["wheels"], self.wheels):
+            w_status["rad"] = w.wheel_rad
+            w_status["gas"] = w.gas
+            w_status["brake"] = w.brake
+            w_status["steer"] = w.steer
+            w_status["phase"] = w.phase
+            w_status["omega"] = w.omega
+        return(status)
 
 
-        return(new_car)
 
     def gas(self, gas):
         'control: rear wheel drive'
