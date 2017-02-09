@@ -63,14 +63,19 @@ BORDER_MIN_COUNT = 4
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
 
+import pdb
+
 class FrictionDetector(contactListener):
     def __init__(self, env):
         contactListener.__init__(self)
         self.env = env
+
     def BeginContact(self, contact):
         self._contact(contact, True)
+
     def EndContact(self, contact):
         self._contact(contact, False)
+
     def _contact(self, contact, begin):
         tile = None
         obj = None
@@ -89,6 +94,11 @@ class FrictionDetector(contactListener):
         tile.color[2] = ROAD_COLOR[2]
         if not obj or "tiles" not in obj.__dict__: return
         if begin:
+            print("car position: "+str(obj.position))
+            print("tile corners' positions: " + str(tile.fixtures[0].shape.vertices)) 
+            print("---------------------")
+
+
             obj.tiles.add(tile)
             #print tile.road_friction, "ADD", len(obj.tiles)
             if not tile.road_visited:
@@ -194,6 +204,9 @@ class CarRacing(gym.Env):
             while beta - alpha < -1.5*math.pi: beta += 2*math.pi
             prev_beta = beta
             proj *= SCALE
+            # beta is the angle of direction of where the road is heading 
+            # When |proj| is large, the direction is turning, and we should make incremental 
+            # modifications of beta. 
             if proj >  0.3: beta -= min(TRACK_TURN_RATE, abs(0.001*proj))
             if proj < -0.3: beta += min(TRACK_TURN_RATE, abs(0.001*proj))
             x += p1x*TRACK_DETAIL_STEP
