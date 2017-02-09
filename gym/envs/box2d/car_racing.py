@@ -372,36 +372,68 @@ class CarRacing(gym.Env):
             if self.tile_visited_count==len(self.track):
                 done = True
 
-            x, y = self.car.hull.position
+            x = self.car.wheels[0].position.x
+            y = self.car.wheels[0].position.y
             
             dist_list = [np.sqrt(np.square(x-px)+np.square(y-py)) for (px,py) in self.tile_center]
             dist_list_idx = zip(dist_list, range(0,len(dist_list)))
             (min_dist, idx) = min(dist_list_idx)
-
+            
+            # road1_l ----- road1_r
+            #   x              x
+            #   x      c       x
+            #   x      a       x
+            #   x      r       x
+            #   x              x
+            # road2_l ----- road2_r
             [road1_l, road1_r, road2_l, road2_r], c = self.road_poly[idx]
 
-            vec1_lx = x - road2_l[0]
-            vec1_ly = y - road2_l[1]
-            vec1_lensq = np.square(vec1_lx) + np.square(vec1_ly)
-            vec2_lx = road2_l[0] - road1_l[0]
-            vec2_ly = road2_l[1] - road2_l[1]
-            vec2_lensq = np.square(vec2_lx) + np.square(vec2_ly)
+            ##### distance to the track edge on the left side #####
+            # vec_l2_car : road2_l --> car
+            vec_l2_car  = (x - road2_l[0], y - road2_l[1])
+            vec_l2_car_lensq = np.square(vec_l2_car[0]) + np.square(vec_l2_car[1])
+
+            # vec_l2_l1 : road2_l --> road1_l
+            vec_l2_l1 = (road1_l[0] - road2_l[0], road1_l[1] - road2_l[1])
+            vec_l2_l1_lensq = np.square(vec_l2_l1[0]) + np.square(vec_l2_l1[1])
 
             # \sqrt{ |vec1|^2 - <vec1, vec2>^2/|vec2|^2 }
-            distance_l = np.sqrt(vec1_lensq-np.square(vec1_lx*vec2_lx + vec1_ly*vec2_ly)/vec2_lensq)
+            distance_l = np.sqrt(vec_l2_car_lensq-
+                    np.square(vec_l2_car[0]*vec_l2_l1[0] + vec_l2_car[1]*vec_l2_l1[1])/vec_l2_l1_lensq)
 
-            vec1_rx = x - road2_r[0]
-            vec1_ry = y - road2_r[1]
-            vec1_lensq = np.square(vec1_rx) + np.square(vec1_ry)
-            vec2_rx = road2_r[0] - road1_r[0]
-            vec2_ry = road2_r[1] - road2_r[1]
-            vec2_lensq = np.square(vec2_rx) + np.square(vec2_ry)
+            # vec_l2_r1: road2_l --> road1_r 
+            vec_l2_r1 = (road1_r[0] - road2_l[0], road1_r[1] - road2_l[1])
+
+            # vec1_(outer product) vec2 
+            if (np.sign(vec_l2_r1[0]*vec_l2_l1[1] - vec_l2_r1[1]*vec_l2_l1[0]) !=
+                   np.sign(vec_l2_car[0]*vec_l2_l1[1] - vec_l2_car[1]*vec_l2_l1[0])):
+                distance_l = -distance_l
+
+            
+            ##### distance to the track edge on the right side #### 
+            # vec_r2_car : road2_r --> car
+            vec_r2_car  = (x - road2_r[0], y - road2_r[1])
+            vec_r2_car_lensq = np.square(vec_r2_car[0]) + np.square(vec_r2_car[1])
+
+            # vec_r2_r1 : road2_r --> road1_r
+            vec_r2_r1 = (road1_r[0] - road2_r[0], road1_r[1] - road2_r[1])
+            vec_r2_r1_lensq = np.square(vec_r2_r1[0]) + np.square(vec_r2_r1[1])
 
             # \sqrt{ |vec1|^2 - <vec1, vec2>^2/|vec2|^2 }
-            distance_r = np.sqrt(vec1_lensq-np.square(vec1_lx*vec2_lx + vec1_ly*vec2_ly)/vec2_lensq)
+            distance_r = np.sqrt(vec_r2_car_lensq-
+                    np.square(vec_r2_car[0]*vec_r2_r1[0] + vec_r2_car[1]*vec_r2_r1[1])/vec_r2_r1_lensq)
+
+            # vec_r2_l1: road2_l --> road1_r 
+            vec_r2_l1 = (road2_r[0] - road1_l[0], road2_r[1] - road1_l[1])
+
+            # vec1_(outer product) vec2 
+            if (np.sign(vec_r2_l1[0]*vec_r2_r1[1] - vec_r2_l1[1]*vec_r2_r1[0]) !=
+                   np.sign(vec_r2_car[0]*vec_r2_r1[1] - vec_r2_car[1]*vec_r2_r1[0])):
+                distance_r = -distance_r
 
             print("distance to right:%f  distance to left:%f\n"%(distance_l, distance_r))
         
+            x, y = self.car.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 done = True
                 step_reward = -100
