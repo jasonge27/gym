@@ -63,14 +63,19 @@ BORDER_MIN_COUNT = 4
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
 
+import pdb
+
 class FrictionDetector(contactListener):
     def __init__(self, env):
         contactListener.__init__(self)
         self.env = env
+
     def BeginContact(self, contact):
         self._contact(contact, True)
+
     def EndContact(self, contact):
         self._contact(contact, False)
+
     def _contact(self, contact, begin):
         tile = None
         obj = None
@@ -82,12 +87,15 @@ class FrictionDetector(contactListener):
         if u2 and "road_friction" in u2.__dict__:
             tile = u2
             obj  = u1
-        if not tile: return
+        if not tile: 
+            return
 
         tile.color[0] = ROAD_COLOR[0]
         tile.color[1] = ROAD_COLOR[1]
         tile.color[2] = ROAD_COLOR[2]
-        if not obj or "tiles" not in obj.__dict__: return
+        if not obj or "tiles" not in obj.__dict__: 
+            return
+
         if begin:
             obj.tiles.add(tile)
             #print tile.road_friction, "ADD", len(obj.tiles)
@@ -169,6 +177,8 @@ class CarRacing(gym.Env):
             if alpha < 0:
                 visited_other_side = True
                 alpha += 2*math.pi
+
+            # find the first checkpoint with dest_alpha > alpha
             while True: # Find destination from checkpoints
                 failed = True
                 while True:
@@ -192,6 +202,9 @@ class CarRacing(gym.Env):
             while beta - alpha < -1.5*math.pi: beta += 2*math.pi
             prev_beta = beta
             proj *= SCALE
+            # beta is the angle of direction of where the road is heading 
+            # When |proj| is large, the direction is turning, and we should make incremental 
+            # modifications of beta. 
             if proj >  0.3: beta -= min(TRACK_TURN_RATE, abs(0.001*proj))
             if proj < -0.3: beta += min(TRACK_TURN_RATE, abs(0.001*proj))
             x += p1x*TRACK_DETAIL_STEP
@@ -254,6 +267,7 @@ class CarRacing(gym.Env):
         return True
 
     def _create_tiles(self, track, border):
+        self.tile_center = []
         for i in range(len(track)):
             alpha1, beta1, x1, y1 = track[i]
             alpha2, beta2, x2, y2 = track[i-1]
@@ -261,6 +275,10 @@ class CarRacing(gym.Env):
             road1_r = (x1 + TRACK_WIDTH*math.cos(beta1), y1 + TRACK_WIDTH*math.sin(beta1))
             road2_l = (x2 - TRACK_WIDTH*math.cos(beta2), y2 - TRACK_WIDTH*math.sin(beta2))
             road2_r = (x2 + TRACK_WIDTH*math.cos(beta2), y2 + TRACK_WIDTH*math.sin(beta2))
+            
+            self.tile_center.extend([((road1_l[0]+road1_r[0]+road2_l[0]+road2_r[0])/4, 
+                                      (road1_l[1]+road1_r[1]+road2_l[1]+road2_r[1])/4)])
+
             t = self.world.CreateStaticBody( fixtures = fixtureDef(
                 shape=polygonShape(vertices=[road1_l, road1_r, road2_r, road2_l])
                 ))
@@ -270,6 +288,7 @@ class CarRacing(gym.Env):
             t.road_visited = False
             t.road_friction = 1.0
             t.fixtures[0].sensor = True
+
             self.road_poly.append(( [road1_l, road1_r, road2_r, road2_l], t.color ))
             self.road.append(t)
             if border[i]:
@@ -279,6 +298,8 @@ class CarRacing(gym.Env):
                 b2_l = (x2 + side* TRACK_WIDTH        *math.cos(beta2), y2 + side* TRACK_WIDTH        *math.sin(beta2))
                 b2_r = (x2 + side*(TRACK_WIDTH+BORDER)*math.cos(beta2), y2 + side*(TRACK_WIDTH+BORDER)*math.sin(beta2))
                 self.road_poly.append(( [b1_l, b1_r, b2_r, b2_l], (1,1,1) if i%2==0 else (1,0,0) ))
+                self.tile_center.extend([((road1_l[0]+road1_r[0]+road2_l[0]+road2_r[0])/4, 
+                                          (road1_l[1]+road1_r[1]+road2_l[1]+road2_r[1])/4)])
 
     def _reset(self):
         self._destroy()
@@ -322,7 +343,65 @@ class CarRacing(gym.Env):
             w.phase = w_status["phase"]
         
         return self._step(None)[0]
+    
+    def _distance_to_tile_edge(self, x, y):
+        dist_list = [np.sqrt(np.square(x-px)+np.square(y-py)) for (px,py) in self.tile_center]
+        dist_list_idx = zip(dist_list, range(0,len(dist_list)))
+        (min_dist, idx) = min(dist_list_idx)
+            
+            # road1_l ----- road1_r
+            #   x              x
+            #   x      c       x
+            #   x      a       x
+            #   x      r       x
+            #   x              x
+            # road2_l ----- road2_r
+        [road1_l, road1_r, road2_r, road2_l], c = self.road_poly[idx]
 
+        ##### distance to the track edge on the left side #####
+        # vec_l2_car : road2_l --> car
+        vec_l2_car  = (x - road2_l[0], y - road2_l[1])
+        vec_l2_car_lensq = np.square(vec_l2_car[0]) + np.square(vec_l2_car[1])
+
+        # vec_l2_l1 : road2_l --> road1_l
+        vec_l2_l1 = (road1_l[0] - road2_l[0], road1_l[1] - road2_l[1])
+        vec_l2_l1_lensq = np.square(vec_l2_l1[0]) + np.square(vec_l2_l1[1])
+
+        # \sqrt{ |vec1|^2 - <vec1, vec2>^2/|vec2|^2 }
+        distance_l = np.sqrt(vec_l2_car_lensq-
+                    np.square(vec_l2_car[0]*vec_l2_l1[0] + vec_l2_car[1]*vec_l2_l1[1])/vec_l2_l1_lensq)
+
+        # vec_l2_r1: road2_l --> road1_r 
+        vec_l2_r1 = (road1_r[0] - road2_l[0], road1_r[1] - road2_l[1])
+
+        # vec1_(outer product) vec2 
+        if (np.sign(vec_l2_r1[0]*vec_l2_l1[1] - vec_l2_r1[1]*vec_l2_l1[0]) != 
+                np.sign(vec_l2_car[0]*vec_l2_l1[1] - vec_l2_car[1]*vec_l2_l1[0])):
+            distance_l = -distance_l
+
+            
+        ##### distance to the track edge on the right side #### 
+        # vec_r2_car : road2_r --> car
+        vec_r2_car  = (x - road2_r[0], y - road2_r[1])
+        vec_r2_car_lensq = np.square(vec_r2_car[0]) + np.square(vec_r2_car[1])
+
+        # vec_r2_r1 : road2_r --> road1_r
+        vec_r2_r1 = (road1_r[0] - road2_r[0], road1_r[1] - road2_r[1])
+        vec_r2_r1_lensq = np.square(vec_r2_r1[0]) + np.square(vec_r2_r1[1])
+
+        # \sqrt{ |vec1|^2 - <vec1, vec2>^2/|vec2|^2 }
+        distance_r = np.sqrt(vec_r2_car_lensq- 
+                np.square(vec_r2_car[0]*vec_r2_r1[0] + vec_r2_car[1]*vec_r2_r1[1])/vec_r2_r1_lensq)
+
+        # vec_r2_l1: road2_r --> road1_l 
+        vec_r2_l1 = (road1_l[0] - road2_r[0], road1_l[1] - road2_r[1])
+
+        # vec1_(outer product) vec2 
+        if (np.sign(vec_r2_l1[0]*vec_r2_r1[1] - vec_r2_l1[1]*vec_r2_r1[0]) !=
+                np.sign(vec_r2_car[0]*vec_r2_r1[1] - vec_r2_car[1]*vec_r2_r1[0])):
+            distance_r = -distance_r
+
+        return (distance_l, distance_r)
 
     def _step(self, action):
         if action is not None:
@@ -347,8 +426,30 @@ class CarRacing(gym.Env):
             self.car.fuel_spent = 0.0
             step_reward = self.reward - self.prev_reward
             self.prev_reward = self.reward
+
             if self.tile_visited_count==len(self.track):
                 done = True
+
+            # distance to both size of the track 
+            # using wheels as the base points
+            distance_l = None
+            distance_r = None
+            for w in self.car.wheels:
+                dl, dr = self._distance_to_tile_edge(w.position.x, w.position.y)
+
+                if not distance_l:
+                    distance_l = dl
+                elif distance_l > dl:
+                    distance_l = dl
+
+
+                if not distance_r:
+                    distance_r = dr
+                elif distance_r > dr:
+                    distance_r = dr
+
+            print("distance to left:%f  distance to right:%f\n"%(distance_l, distance_r))
+        
             x, y = self.car.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 done = True
