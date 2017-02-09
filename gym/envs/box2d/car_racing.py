@@ -169,6 +169,8 @@ class CarRacing(gym.Env):
             if alpha < 0:
                 visited_other_side = True
                 alpha += 2*math.pi
+
+            # find the first checkpoint with dest_alpha > alpha
             while True: # Find destination from checkpoints
                 failed = True
                 while True:
