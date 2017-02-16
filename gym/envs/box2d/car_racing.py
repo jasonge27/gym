@@ -156,7 +156,7 @@ class CarRacing(gym.Env):
                 rad = 1.5*TRACK_RAD
             checkpoints.append((alpha, rad*math.cos(alpha), rad*math.sin(alpha)))
 
-        print "\n".join(str(h) for h in checkpoints)
+        print("\n".join(str(h) for h in checkpoints))
         #self.road_poly = [ (    # uncomment this to see checkpoints
         #    [ (tx,ty) for a,tx,ty in checkpoints ],
         #    (0.7,0.7,0.9) ) ]
@@ -432,24 +432,18 @@ class CarRacing(gym.Env):
 
             # distance to both size of the track 
             # using wheels as the base points
-            distance_l = None
-            distance_r = None
-            for w in self.car.wheels:
-                dl, dr = self._distance_to_tile_edge(w.position.x, w.position.y)
+            w = self.car.wheels[0]
+            distance_lf, _ = self._distance_to_tile_edge(w.position.x, w.position.y)
+            w = self.car.wheels[1] 
+            _, distance_rf = self._distance_to_tile_edge(w.position.x, w.position.y)
+            w = self.car.wheels[2]
+            distance_lb, _ = self._distance_to_tile_edge(w.position.x, w.position.y)
+            w = self.car.wheels[3]
+            _, distance_rb = self._distance_to_tile_edge(w.position.x, w.position.y)
 
-                if not distance_l:
-                    distance_l = dl
-                elif distance_l > dl:
-                    distance_l = dl
-
-
-                if not distance_r:
-                    distance_r = dr
-                elif distance_r > dr:
-                    distance_r = dr
-
-            print("distance to left:%f  distance to right:%f\n"%(distance_l, distance_r))
-        
+            print("distance to left-front:%f  distance to right-front:%f"%(distance_lf, distance_rf))
+            print("distance to left-back:%f  distance to right-back:%f\n"%(distance_lb, distance_rb)) 
+            
             x, y = self.car.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 done = True
