@@ -345,13 +345,14 @@ class CarRacing(gym.Env):
         return self._step(None)[0]
     
     def _distance_to_tile_edge(self, x, y, idx):
-            # road1_l ----- road1_r
-            #   x              x
-            #   x      c       x
-            #   x      a       x
-            #   x      r       x
-            #   x              x
-            # road2_l ----- road2_r
+        # distance from (x,y) to both sides of the idx-th tile
+        # road1_l ----- road1_r
+        #   x              x
+        #   x      c       x
+        #   x      a       x
+        #   x      r       x
+        #   x              x
+        # road2_l ----- road2_r
         [road1_l, road1_r, road2_r, road2_l], c = self.road_poly[idx]
 
         ##### distance to the track edge on the left side #####
@@ -419,6 +420,8 @@ class CarRacing(gym.Env):
         #self.state = self._render("rgb_array")
         self.state = self._render("human")
 
+        observation = {"pixel":self.state, "params":None}
+
         step_reward = 0
         done = False
         if action is not None: # First step without action, called from reset()
@@ -458,7 +461,19 @@ class CarRacing(gym.Env):
                 done = True
                 step_reward = -100
 
-        return self.state, step_reward, done, {}
+            idx = self._find_closest_tile_idx(w.position.x, w.position.y)
+            [road1_l, road1_r, road2_r, road2_l], c = self.road_poly[idx]
+            vec_lb_lf = (self.car.wheels[0].position.x - self.car.wheels[2].position.x, 
+                         self.car.wheels[0].position.y - self.car.wheels[2].position.y)
+            vec_2l_1l = (road1_l[0] - road2_l[0], road1_l[1] - road2_l[1])
+            proj_len = np.fabs((vec_2l_1l[0]*vec_lb_lf[0]+vec_2l_1l[1]*vec_lb_lf[1])/np.sqrt(vec_2l_1l[0]**2 + vec_2l_1l[1]**2))
+            angle = np.arctan2(distance_lf - distance_lb, proj_len)
+            print("car body relative angle:%f\n"%(angle))
+
+            observation["params"] = [min(distance_lf ,distance_lb), min(distance_rf, distance_rb), angle]
+           
+        
+        return observation, step_reward, done, {}
 
     def _render(self, mode='human', close=False):
         if close:
