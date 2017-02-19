@@ -428,15 +428,15 @@ class CarRacing(gym.Env):
 
             # distance to both size of the track 
             # using wheels as the base points
-
+            
             w = self.car.wheels[0]
-            distance_lf, _ = self._distance_to_tile_edge(w.position.x, w.position.y)
+            distance_lf, _ = self._distance_to_tile_edge(w.position.x, w.position.y, idx)
             w = self.car.wheels[1] 
-            _, distance_rf = self._distance_to_tile_edge(w.position.x, w.position.y)
+            _, distance_rf = self._distance_to_tile_edge(w.position.x, w.position.y, idx)
             w = self.car.wheels[2]
-            distance_lb, _ = self._distance_to_tile_edge(w.position.x, w.position.y)
+            distance_lb, _ = self._distance_to_tile_edge(w.position.x, w.position.y, idx)
             w = self.car.wheels[3]
-            _, distance_rb = self._distance_to_tile_edge(w.position.x, w.position.y)
+            _, distance_rb = self._distance_to_tile_edge(w.position.x, w.position.y, idx)
 
             print("distance to left-front:%f  distance to right-front:%f"%(distance_lf, distance_rf))
             print("distance to left-back:%f  distance to right-back:%f\n"%(distance_lb, distance_rb)) 
