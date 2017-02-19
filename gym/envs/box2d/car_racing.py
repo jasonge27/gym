@@ -344,11 +344,7 @@ class CarRacing(gym.Env):
         
         return self._step(None)[0]
     
-    def _distance_to_tile_edge(self, x, y):
-        dist_list = [np.sqrt(np.square(x-px)+np.square(y-py)) for (px,py) in self.tile_center]
-        dist_list_idx = zip(dist_list, range(0,len(dist_list)))
-        (min_dist, idx) = min(dist_list_idx)
-            
+    def _distance_to_tile_edge(self, x, y, idx):
             # road1_l ----- road1_r
             #   x              x
             #   x      c       x
@@ -434,8 +430,10 @@ class CarRacing(gym.Env):
             # using wheels as the base points
             distance_l = None
             distance_r = None
+            dist_list = [np.sqrt(np.square(x-px)+np.square(y-py)) for (px,py) in self.tile_center]
+            (min_dist, idx) = min(zip(dist_list, range(0,len(dist_list))))
             for w in self.car.wheels:
-                dl, dr = self._distance_to_tile_edge(w.position.x, w.position.y)
+                dl, dr = self._distance_to_tile_edge(w.position.x, w.position.y, idx)
 
                 if not distance_l:
                     distance_l = dl
