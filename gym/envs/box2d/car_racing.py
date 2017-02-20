@@ -469,8 +469,10 @@ class CarRacing(gym.Env):
             proj_len = np.fabs((vec_2l_1l[0]*vec_lb_lf[0]+vec_2l_1l[1]*vec_lb_lf[1])/np.sqrt(vec_2l_1l[0]**2 + vec_2l_1l[1]**2))
             angle = np.arctan2(distance_lf - distance_lb, proj_len)
             print("car body relative angle:%f\n"%(angle))
+            velocity = np.sqrt(self.car.hull.linearVelocity.x**2 + self.car.hull.linearVelocity.y**2)
+            print("car linear velocity:%f\n"%(velocity))
 
-            observation["params"] = [min(distance_lf ,distance_lb), min(distance_rf, distance_rb), angle]
+            observation["params"] = [velocity, min(distance_lf ,distance_lb), min(distance_rf, distance_rb), angle]
            
         
         return observation, step_reward, done, {}
