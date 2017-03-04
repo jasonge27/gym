@@ -82,7 +82,9 @@ class Env(object):
     observation_space = None
 
     # Override in ALL subclasses
-    def _step(self, action): raise NotImplementedError
+    def _step(self, action): 
+        #raise NotImplementedError
+        pass
     def _reset(self): raise NotImplementedError
     def _render(self, mode='human', close=False):
         if close:
@@ -119,7 +121,7 @@ class Env(object):
             done (boolean): whether the episode has ended, in which case further step() calls will return undefined results
             info (dict): contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
-        observation, reward, done, info = self._step(action)
+        observation, reward, done, info = self._step(action )
         return observation, reward, done, info
 
     def reset(self):

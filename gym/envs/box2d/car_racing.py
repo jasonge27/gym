@@ -50,9 +50,9 @@ WINDOW_H = 1000
 SCALE       = 6.0        # Track scale
 TRACK_RAD   = 900/SCALE  # Track is heavily morphed circle with this radius
 PLAYFIELD   = 2000/SCALE # Game over boundary
-FPS         = 50
+FPS         = 50 
 ZOOM        = 2.7        # Camera zoom
-ZOOM_FOLLOW = True       # Set to False for fixed view (don't use zoom)
+ZOOM_FOLLOW = False       # Set to False for fixed view (don't use zoom)
 
 
 TRACK_DETAIL_STEP = 21/SCALE
@@ -114,7 +114,7 @@ class CarRacing(gym.Env):
     }
 
     def __init__(self):
-        self._seed()
+        self._seed(2017)
         self.contactListener_keepref = FrictionDetector(self)
         self.world = Box2D.b2World((0,0), contactListener=self.contactListener_keepref)
         self.viewer = None
@@ -125,12 +125,18 @@ class CarRacing(gym.Env):
         self.reward = 0.0
         self.prev_reward = 0.0
 
+        self.enable_rendering=True
+
+
         self.action_space = spaces.Box(np.array([-1,0,0]), np.array([+1,+1,+1]))  # steer, gas, brake
         self.observation_space = spaces.Box(low=0, high=255, shape=(STATE_H, STATE_W, 3))
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
+
+    def _configure(self, enable_rendering):
+        self.enable_rendering=enable_rendering
 
     def _destroy(self):
         if not self.road: return
@@ -140,13 +146,16 @@ class CarRacing(gym.Env):
         self.car.destroy()
 
     def _create_track(self):
+        np.random.seed(2017)
         CHECKPOINTS = 12
 
         # Create checkpoints
         checkpoints = []
         for c in range(CHECKPOINTS):
-            alpha = 2*math.pi*c/CHECKPOINTS + self.np_random.uniform(0, 2*math.pi*1/CHECKPOINTS)
-            rad = self.np_random.uniform(TRACK_RAD/3, TRACK_RAD)
+            #alpha = 2*math.pi*c/CHECKPOINTS + self.np_random.uniform(0, 2*math.pi*1/CHECKPOINTS)
+            #rad = self.np_random.uniform(TRACK_RAD/3, TRACK_RAD)
+            alpha = 2*math.pi*c/CHECKPOINTS + np.random.uniform(0, 2*math.pi*1/CHECKPOINTS)
+            rad = np.random.uniform(TRACK_RAD/3, TRACK_RAD)
             if c==0:
                 alpha = 0
                 rad = 1.5*TRACK_RAD
@@ -156,7 +165,7 @@ class CarRacing(gym.Env):
                 rad = 1.5*TRACK_RAD
             checkpoints.append((alpha, rad*math.cos(alpha), rad*math.sin(alpha)))
 
-        print("\n".join(str(h) for h in checkpoints))
+        #print("\n".join(str(h) for h in checkpoints))
         #self.road_poly = [ (    # uncomment this to see checkpoints
         #    [ (tx,ty) for a,tx,ty in checkpoints ],
         #    (0.7,0.7,0.9) ) ]
@@ -227,7 +236,7 @@ class CarRacing(gym.Env):
             elif pass_through_start and i1==-1:
                 i1 = i
                 break
-        print("Track generation: %i..%i -> %i-tiles track" % (i1, i2, i2-i1))
+        #print("Track generation: %i..%i -> %i-tiles track" % (i1, i2, i2-i1))
         assert i1!=-1
         assert i2!=-1
 
@@ -313,7 +322,7 @@ class CarRacing(gym.Env):
         while True:
             success = self._create_track()
             if success: break
-            print("retry to generate track (normal if there are not many of this messages)")
+            #print("retry to generate track (normal if there are not many of this messages)")
         self.car = Car(self.world, *self.track[0][1:4])
 
         return self._step(None)[0]
@@ -418,7 +427,10 @@ class CarRacing(gym.Env):
 
         #self.state = self._render("state_pixels")
         #self.state = self._render("rgb_array")
-        self.state = self._render("human")
+        if self.enable_rendering:
+            self.state = self._render("human")
+        else:
+            self.state = None
 
         observation = {"pixel":self.state, "params":None}
 
@@ -433,6 +445,7 @@ class CarRacing(gym.Env):
             self.prev_reward = self.reward
 
             if self.tile_visited_count==len(self.track):
+                print("GAME INFO: round completed")
                 done = True
 
             # distance to both size of the track 
@@ -453,11 +466,12 @@ class CarRacing(gym.Env):
             idx = self._find_closest_tile_idx(w.position.x, w.position.y)
             _, distance_rb = self._distance_to_tile_edge(w.position.x, w.position.y, idx)
 
-            print("distance to left-front:%f  distance to right-front:%f"%(distance_lf, distance_rf))
-            print("distance to left-back:%f  distance to right-back:%f\n"%(distance_lb, distance_rb)) 
+            #print("distance to left-front:%f  distance to right-front:%f"%(distance_lf, distance_rf))
+            #print("distance to left-back:%f  distance to right-back:%f\n"%(distance_lb, distance_rb)) 
             
             x, y = self.car.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
+                print("GAME INFO: out of track")
                 done = True
                 step_reward = -100
 
@@ -468,11 +482,16 @@ class CarRacing(gym.Env):
             vec_2l_1l = (road1_l[0] - road2_l[0], road1_l[1] - road2_l[1])
             proj_len = np.fabs((vec_2l_1l[0]*vec_lb_lf[0]+vec_2l_1l[1]*vec_lb_lf[1])/np.sqrt(vec_2l_1l[0]**2 + vec_2l_1l[1]**2))
             angle = np.arctan2(distance_lf - distance_lb, proj_len)
-            print("car body relative angle:%f\n"%(angle))
+            #print("car body relative angle:%f\n"%(angle))
             velocity = np.sqrt(self.car.hull.linearVelocity.x**2 + self.car.hull.linearVelocity.y**2)
-            print("car linear velocity:%f\n"%(velocity))
+            #print("car linear velocity:%f\n"%(velocity))
 
             observation["params"] = [velocity, min(distance_lf ,distance_lb), min(distance_rf, distance_rb), angle]
+
+
+            if (distance_lf < 0 or distance_lb <0 or distance_rf <0 or distance_rb <0):
+                done = True
+                step_reward = -100
            
         
         return observation, step_reward, done, {}
