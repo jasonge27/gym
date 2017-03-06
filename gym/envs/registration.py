@@ -113,15 +113,19 @@ class EnvRegistry(object):
     def __init__(self):
         self.env_specs = {}
 
-    def make(self, id):
+    def make(self, id, max_steps = 10000, max_seconds = 300):
         logger.info('Making new env: %s', id)
         spec = self.spec(id)
         env = spec.make()
+        env.spec.max_episode_steps = max_steps
+        env.spec.max_seconds = max_seconds
+
         if (env.spec.timestep_limit is not None) and not spec.tags.get('vnc'):
             from gym.wrappers.time_limit import TimeLimit
             env = TimeLimit(env,
                             max_episode_steps=env.spec.max_episode_steps,
                             max_episode_seconds=env.spec.max_episode_seconds)
+        
         return env
 
 
@@ -157,8 +161,8 @@ registry = EnvRegistry()
 def register(id, **kwargs):
     return registry.register(id, **kwargs)
 
-def make(id):
-    return registry.make(id)
+def make(id, max_steps = 10000, max_seconds = 300):
+    return registry.make(id, max_steps, max_seconds)
 
 def spec(id):
     return registry.spec(id)
